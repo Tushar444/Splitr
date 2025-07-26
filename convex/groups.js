@@ -21,11 +21,6 @@ export const getGroupExpenses = query({
       .withIndex("by_group", (q) => q.eq("groupId", groupId))
       .collect();
 
-    const settlements = await ctx.db
-      .query("settlements")
-      .filter((q) => q.eq(q.field("groupId"), groupId))
-      .collect();
-
     const memberDetails = await Promise.all(
       group.members.map(async (m) => {
         const u = await ctx.db.get(m.userId);
@@ -46,12 +41,6 @@ export const getGroupExpenses = query({
         const debtorIdx = indexMap.get(split.userId);
         txn[debtorIdx][payerIdx] += split.amount;
       }
-    }
-
-    for (const s of settlements) {
-      const fromIdx = indexMap.get(s.paidByUserId);
-      const toIdx = indexMap.get(s.receivedByUserId);
-      txn[fromIdx][toIdx] -= s.amount;
     }
 
     const net = txn.map((row, i) => {
@@ -108,7 +97,6 @@ export const getGroupExpenses = query({
       },
       members: memberDetails,
       expenses,
-      settlements,
       balances,
       userLookupMap,
     };
@@ -142,15 +130,7 @@ export const deleteGroup = mutation({
       .withIndex("by_group", (q) => q.eq("groupId", groupId))
       .collect();
 
-    const settlements = await ctx.db
-      .query("settlements")
-      .withIndex("by_group", (q) => q.eq("groupId", groupId))
-      .collect();
-
     await Promise.all(expenses.map((expense) => ctx.db.delete(expense._id)));
-    await Promise.all(
-      settlements.map((settlement) => ctx.db.delete(settlement._id))
-    );
 
     await ctx.db.delete(groupId);
 

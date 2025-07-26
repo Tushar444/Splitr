@@ -33,7 +33,6 @@ export default function PersonExpensesPage() {
 
   const otherUser = data?.otherUser;
   const expenses = data?.expenses || [];
-  const settlements = data?.settlements || [];
   const balance = data?.balance || 0;
 
   return (

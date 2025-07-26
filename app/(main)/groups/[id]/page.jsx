@@ -34,7 +34,6 @@ export default function GroupExpensesPage() {
   const group = data?.group;
   const members = data?.members || [];
   const expenses = data?.expenses || [];
-  const settlements = data?.settlements || [];
   const balances = data?.balances || [];
   const userLookupMap = data?.userLookupMap || {};
 

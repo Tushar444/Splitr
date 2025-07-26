@@ -8,6 +8,9 @@ export const getExpensesBetweenUsers = query({
     const me = await ctx.runQuery(internal.users.getCurrentUser);
     if (me._id === userId) throw new Error("Cannot query yourself");
 
+    const other = await ctx.db.get(userId);
+    if (!other) throw new Error("User not found");
+
     const myPaid = await ctx.db
       .query("expenses")
       .withIndex("by_user_and_group", (q) =>
@@ -36,27 +39,6 @@ export const getExpensesBetweenUsers = query({
 
     expenses.sort((a, b) => b.date - a.date);
 
-    const settlements = await ctx.db
-      .query("settlements")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("groupId"), undefined),
-          q.or(
-            q.and(
-              q.eq(q.field("paidByUserId"), me._id),
-              q.eq(q.field("receivedByUserId"), userId)
-            ),
-            q.and(
-              q.eq(q.field("paidByUserId"), userId),
-              q.eq(q.field("receivedByUserId"), me._id)
-            )
-          )
-        )
-      )
-      .collect();
-
-    settlements.sort((a, b) => b.date - a.date);
-
     let balance = 0;
 
     for (const e of expenses) {
@@ -69,17 +51,8 @@ export const getExpensesBetweenUsers = query({
       }
     }
 
-    for (const s of settlements) {
-      if (s.paidByUserId === me._id) balance += s.amount;
-      else balance -= s.amount;
-    }
-
-    const other = await ctx.db.get(userId);
-    if (!other) throw new Error("User not found");
-
     return {
       expenses,
-      settlements,
       otherUser: {
         id: other._id,
         name: other.name,
@@ -105,28 +78,6 @@ export const deleteExpense = mutation({
 
     if (expense.createdBy !== user._id && expense.paidByUserId !== user._id) {
       throw new Error("You don't have permission to delete this expense");
-    }
-
-    const allSettlements = await ctx.db.query("settlements").collect();
-
-    const relatedSettlements = allSettlements.filter(
-      (settlement) =>
-        settlement.relatedExpenseIds !== undefined &&
-        settlement.relatedExpenseIds.includes(args.expenseId)
-    );
-
-    for (const settlement of relatedSettlements) {
-      const updatedRelatedExpenseIds = settlement.relatedExpenseIds.filter(
-        (id) => id !== args.expenseId
-      );
-
-      if (updatedRelatedExpenseIds.length === 0) {
-        await ctx.db.delete(settlement._id);
-      } else {
-        await ctx.db.patch(settlement._id, {
-          relatedExpenseIds: updatedRelatedExpenseIds,
-        });
-      }
     }
 
     await ctx.db.delete(args.expenseId);

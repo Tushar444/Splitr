@@ -33,25 +33,6 @@ export const getUserBalances = query({
       }
     }
 
-    const settlements = (await ctx.db.query("settlements").collect()).filter(
-      (s) =>
-        !s.groupId &&
-        (s.paidByUserId === currentUser._id ||
-          s.receivedByUserId === currentUser._id)
-    );
-
-    for (const s of settlements) {
-      if (s.paidByUserId === currentUser._id) {
-        youOwe -= s.amount;
-        (balanceByUser[s.receivedByUserId] ??= { owed: 0, owing: 0 }).owing -=
-          s.amount;
-      } else {
-        youAreOwed -= s.amount;
-        (balanceByUser[s.paidByUserId] ??= { owed: 0, owing: 0 }).owed -=
-          s.amount;
-      }
-    }
-
     const youOweList = [];
     const youAreOwedByList = [];
     for (const [uid, { owed, owing }] of Object.entries(balanceByUser)) {
@@ -198,27 +179,6 @@ export const getUserGroups = query({
             if (userSplit && !userSplit.paid) {
               balance -= userSplit.amount;
             }
-          }
-        });
-
-        const settlements = await ctx.db
-          .query("settlements")
-          .filter((q) =>
-            q.and(
-              q.eq(q.field("groupId"), group._id),
-              q.or(
-                q.eq(q.field("paidByUserId"), currentUser._id),
-                q.eq(q.field("receivedByUserId"), currentUser._id)
-              )
-            )
-          )
-          .collect();
-
-        settlements.forEach((settlement) => {
-          if (settlement.paidByUserId === currentUser._id) {
-            balance += settlement.amount;
-          } else {
-            balance -= settlement.amount;
           }
         });
 
